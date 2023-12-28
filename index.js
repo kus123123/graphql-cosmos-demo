@@ -1,6 +1,8 @@
 require('dotenv').config()
-const { ApolloServer, gql } = require('apollo-server')
+const { ApolloServer, gql } = require('apollo-server-express')
 const { CosmosClient } = require('@azure/cosmos')
+const express = require('express')
+
 
 const client = new CosmosClient({
   endpoint: process.env.ENDPOINT,
@@ -12,39 +14,35 @@ const container = client
   .container(process.env.CONTAINER)
 
 const typeDefs = gql`
-  enum State {
-    COMPLETE
-    INCOMPLETE
-    IN_PROGRESS
-  }
+ 
 
-  type Todo {
+  type Heroes {
     id: ID!
-    title: String
-    state: State
+    name: String!
+    course: String!
   }
   type Query {
-    todos: [Todo]
-    todo(id: ID!): Todo
+    datas: [Heroes]
+    data(id: ID!): Heroes
   }
   type Mutation {
-    createTodo(title: String!, state: State!): Todo
+    createData(id: ID! , name: String! , course: String!): Heroes
   }
 `
 
 const resolvers = {
   Query: {
-    todos: async () => {
+    datas: async () => {
       const response = await container.items.query('SELECT * from c').fetchAll()
       return response.resources
     },
-    todo: async (root, { id }) => {
+    data: async (root, { id }) => {
       const response = await container.item(id, undefined).read()
       return response.resource
     }
   },
   Mutation: {
-    createTodo: async (root, args) => {
+    createData: async (root, args) => {
       const response = await container.items.create(args)
       return response.resource
     }
@@ -52,7 +50,11 @@ const resolvers = {
 }
 
 const server = new ApolloServer({ typeDefs, resolvers })
-server.listen().then(({ url }) => {
-  console.log(`🚀 Server ready at ${url} 🚀`)
-  console.log(`Visit ${url}graphiql to load the playground`)
-})
+const app = express();
+
+server.start().then(() => {
+server.applyMiddleware({ app });
+});
+app.listen({ port: 4000 }, () =>
+  console.log(`🚀 Server ready at http://localhost:4000${server.graphqlPath}`)
+);
